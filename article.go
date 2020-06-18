@@ -29,7 +29,7 @@ type article struct {
 }
 
 func CrawlArticle(url string) ([]byte, error) {
-	doc, err := parseArticle(url)
+	doc, err := parseUrl(url)
 	if err != nil {
 		return nil, err
 	}
@@ -73,14 +73,13 @@ func CrawlArticle(url string) ([]byte, error) {
 	return jsondata, nil
 }
 
-func parseArticle(url string) (*goquery.Document, error) {
-	client := &http.Client{}
+func parseUrl(url string) (*goquery.Document, error) {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
-	req.AddCookie(&http.Cookie{Name: "over18", Value: "1"})
-	resp, err := client.Do(req)
+	req.AddCookie(over18cookie)
+	resp, err := defaultClient.Do(req)
 	if err != nil {
 		return nil, err
 	}

@@ -12,21 +12,28 @@ import (
 //
 
 type PTT struct {
-	baseUrl   string
+	baseURL   string
+	bbsURL    string
 	storePath string
 	board     mapset.Set
 }
 
+var (
+	over18cookie  *http.Cookie = &http.Cookie{Name: "over18", Value: "1"}
+	defaultClient *http.Client = &http.Client{}
+)
+
 func NewPTT(storePathFolder string) *PTT {
 	p := new(PTT)
-	p.baseUrl = "https://www.ptt.cc/bbs/"
+	p.baseURL = "https://www.ptt.cc/"
+	p.bbsURL = "https://www.ptt.cc/bbs/"
 	p.storePath = storePathFolder
 	p.board = mapset.NewSet()
 	return p
 }
 
 func (p *PTT) SetBoard(board string) error {
-	if isValidBoard(p.baseUrl, board) {
+	if isValidBoard(p.bbsURL, board) {
 		p.board.Add(board)
 	} else {
 		return fmt.Errorf("board name %s not valid", board)
@@ -37,7 +44,7 @@ func (p *PTT) SetBoard(board string) error {
 func (p *PTT) SetBoardWithSlice(board []string) error {
 	errMsg := ""
 	for id := range board {
-		if isValidBoard(p.baseUrl, board[id]) {
+		if isValidBoard(p.bbsURL, board[id]) {
 			p.board.Add(board[id])
 		} else {
 			errMsg += board[id] + " "
@@ -49,8 +56,8 @@ func (p *PTT) SetBoardWithSlice(board []string) error {
 	return nil
 }
 
-func isValidBoard(baseurl, board string) bool {
-	if resp, err := http.Get(baseurl + board + "/index.html"); err != nil {
+func isValidBoard(bbsUrl, board string) bool {
+	if resp, err := http.Get(bbsUrl + board + "/index.html"); err != nil {
 		fmt.Println(err)
 		return false
 	} else if resp.StatusCode != 200 {

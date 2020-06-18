@@ -11,7 +11,7 @@ func testOneBoard(t *testing.T) {
 
 }
 func Test_SetBoard(t *testing.T) {
-	p := NewPTT()
+	p := NewPTT("dat/")
 	validBoard := []string{"gossiping", "Gossiping", "seniorhigh", "b07902xxx"}
 	invalidBoard := []string{"ABCfjisiodjs", "fjiosw9dnjsc", "123", "ABCDEFG"}
 	assert := assert.New(t)
@@ -27,9 +27,9 @@ func Test_SetBoard(t *testing.T) {
 		}
 	}
 
-	pWithValidSlice := NewPTT()
+	pWithValidSlice := NewPTT("dat/")
 	pWithValidSlice.SetBoardWithSlice(validBoard)
-	pWithInvalidSlice := NewPTT()
+	pWithInvalidSlice := NewPTT("dat/")
 	pWithInvalidSlice.SetBoardWithSlice(invalidBoard)
 	assert.True(p.board.Equal(pWithValidSlice.board))
 	assert.False(p.board.Equal(pWithInvalidSlice.board))
