@@ -1,16 +1,21 @@
 package main
 
 import (
-	"fmt"
-
 	crawler "github.com/jameshwc/Ptt-Crawler-Go"
 )
 
+const (
+	pages        = 1
+	numOfRoutine = 100
+	storePath    = "dat/"
+)
+
 func main() {
-	p := crawler.NewPTT("test")
-	fmt.Println(p.GetArticlesURL("Gossiping", 300))
-	// if p.SetBoard("gossiping")
-
-	// crawler.CrawlArticle("https://www.ptt.cc/bbs/Wine/M.1588519995.A.BA8.html")
-
+	p := crawler.NewPTT(storePath, pages, numOfRoutine)
+	// go p.CrawlBoard("Gossiping")
+	// go p.CrawlBoard("Womentalk")
+	// for {
+	// 	time.Sleep(10 * time.Second)
+	// }
+	p.CrawlBoard("Gossiping")
 }
