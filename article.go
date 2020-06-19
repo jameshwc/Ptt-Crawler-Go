@@ -1,7 +1,6 @@
 package ptt
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -28,12 +27,24 @@ type article struct {
 	Replies   []reply `json:"Replies"`
 }
 
-func CrawlArticle(url string) ([]byte, error) {
+func CrawlArticle(url string) (article, error) {
+	return getArticle(url)
+}
+
+func CrawlArticleThread(url string, ch chan article, sem chan int) {
+	a, err := getArticle(url)
+	if err == nil {
+		ch <- a
+	}
+	<-sem
+
+}
+func getArticle(url string) (article, error) {
 	doc, err := parseUrl(url)
 	if err != nil {
-		return nil, err
+		log.Println(err)
+		return article{}, err
 	}
-
 	author, board, class, title, timestamp := parseArticleAttr(doc.Find(".article-meta-value").Remove())
 	doc.Find(".article-metaline").Remove()
 	doc.Find(".article-metaline-right").Remove()
@@ -55,24 +66,24 @@ func CrawlArticle(url string) ([]byte, error) {
 		ipdatetime := s.Find(".push-ipdatetime").Text()
 		vote := s.Find(".push-tag").Text()
 		userid := s.Find(".push-userid").Text()
+		trimContent := func(s string) string {
+			if s[0] == ':' {
+				return TrimSpace(s[1:])
+			}
+			return TrimSpace(s)
+		}
 		replies = append(replies, reply{
 			Floor:     i + 1,
 			UserID:    TrimSpace(userid),
-			Vote:      vote[:len(vote)-1],                 // remove space
-			Content:   s.Find(".push-content").Text()[2:], // remove : and space
-			Timestamp: ipdatetime[1 : len(ipdatetime)-1],  // remove space and newline
+			Vote:      TrimSpace(vote), // remove space
+			Content:   trimContent(s.Find(".push-content").Text()),
+			Timestamp: TrimSpace(ipdatetime), // remove space and newline
 		})
 		s.Remove()
 	})
 	// now "doc.Find("#main-content").Text()" has all the content including the author's reply in the reply area
-	art := article{Board: board, Class: class, Title: title, Author: author, Timestamp: timestamp, Content: content, Replies: replies}
-	jsondata, err := json.Marshal(art)
-	if err != nil {
-		log.Fatal(err)
-	}
-	return jsondata, nil
+	return article{Board: board, Class: class, Title: title, Author: author, Timestamp: timestamp, Content: content, Replies: replies}, nil
 }
-
 func parseUrl(url string) (*goquery.Document, error) {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
@@ -85,7 +96,7 @@ func parseUrl(url string) (*goquery.Document, error) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("CrawlArticle: status code %d %s", resp.StatusCode, resp.Status)
+		return nil, fmt.Errorf("ParseUrl: status code %d %s at %s url", resp.StatusCode, resp.Status, url)
 	}
 	return goquery.NewDocumentFromReader(resp.Body)
 }
@@ -98,15 +109,21 @@ func parseArticleAttr(s *goquery.Selection) (author, board, class, title, date s
 }
 func parseTitle(artTitle string) (string, string) {
 	var class []byte
+	classStr := ""
 	for i := range artTitle {
 		if artTitle[i] == '[' {
-			for artTitle[i] != ']' {
+			for i < len(artTitle) && artTitle[i] != ']' {
 				class = append(class, artTitle[i])
 				i++
 			}
-			class = append(class, artTitle[i])
+			if i != len(artTitle) {
+				class = append(class, artTitle[i])
+				classStr = string(class)
+			} else {
+				classStr = ""
+			}
 			break
 		}
 	}
-	return TrimSpace(string(class)), TrimSpace(Trim(artTitle, string(class)))
+	return TrimSpace(classStr), TrimSpace(Trim(artTitle, classStr))
 }

@@ -1,34 +1,47 @@
 package ptt
 
 import (
+	"crypto/tls"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
+	"net/url"
+	"os"
+	"path/filepath"
+	"time"
 
 	mapset "github.com/deckarep/golang-set"
 )
 
-// crawlBoard
-//
+const (
+	maxNumArticles = 15000
+)
 
 type PTT struct {
-	baseURL   string
-	bbsURL    string
-	storePath string
-	board     mapset.Set
+	baseURL      string
+	bbsURL       string
+	storePath    string
+	numOfRoutine int
+	pages        int
+	board        mapset.Set
 }
 
 var (
-	over18cookie  *http.Cookie = &http.Cookie{Name: "over18", Value: "1"}
+	over18cookie *http.Cookie = &http.Cookie{Name: "over18", Value: "1"}
+	// defaultClient *http.Client = getClient()
 	defaultClient *http.Client = &http.Client{}
 )
 
-func NewPTT(storePathFolder string) *PTT {
+func NewPTT(storePathFolder string, pages, numsOfRoutine int) *PTT {
 	p := new(PTT)
 	p.baseURL = "https://www.ptt.cc/"
 	p.bbsURL = "https://www.ptt.cc/bbs/"
 	p.storePath = storePathFolder
+	p.numOfRoutine = numsOfRoutine
 	p.board = mapset.NewSet()
+	p.pages = pages
 	return p
 }
 
@@ -64,4 +77,74 @@ func isValidBoard(bbsUrl, board string) bool {
 		return false
 	}
 	return true
+}
+
+func (p *PTT) CrawlBoard(board string) {
+	URLlist, err := p.GetArticlesURLThread(board, p.pages)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("Completely downloading URLlist...Got %d articles ready to download...\n", len(URLlist))
+	sem := make(chan int, p.numOfRoutine)
+	articles := make(chan article, (p.pages+1)*30) // make sure channel has enough space if page == 1
+	remains := len(URLlist)
+	for i := range URLlist {
+		sem <- 1
+		go CrawlArticleThread(URLlist[i], articles, sem)
+		if i%100 == 0 {
+			fmt.Printf("%d articles...\n", len(articles))
+		}
+		time.Sleep(100)
+		// if (i+1)%maxNumArticles == 0 {
+		// 	// fmt.Println("Due to CDN's limit of traffic, now wait 1 minute and create files...")
+		// 	for len(articles) != maxNumArticles && len(sem) != 0 {
+		// 	}
+		// 	fmt.Printf("%d articles have been downloaded!", len(articles))
+		// 	close(articles)
+		// 	go saveFile(p.storePath, articles)
+		// 	// time.Sleep(60 * time.Second)
+		// 	articles = make(chan article, maxNumArticles)
+		// 	remains -= maxNumArticles
+		// }
+	}
+	for len(articles) != remains {
+	}
+	close(articles)
+	fmt.Println("All articles downloaded!")
+	saveFile(p.storePath, articles)
+}
+
+func saveFile(path string, articles chan article) {
+	articleSlice := make([]article, len(articles))
+	idx := 0
+	for a := range articles {
+		articleSlice[idx] = a
+		idx++
+	}
+	jsonData, err := json.Marshal(articleSlice)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("Now create json file...")
+	outputFile, err := os.Create(filepath.Join(path, time.Now().Format("0102_150405")+".json"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer outputFile.Close()
+	outputFile.Write(jsonData)
+}
+
+func getClient() *http.Client {
+	proxyURL, err := url.Parse("proxy.hinet.net")
+	if err != nil {
+		panic(err)
+	}
+	t := &http.Transport{
+		Proxy:           http.ProxyURL(proxyURL),
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	return &http.Client{
+		Transport: t,
+		Timeout:   time.Duration(10 * time.Second),
+	}
 }
