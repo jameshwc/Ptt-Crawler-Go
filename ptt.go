@@ -29,8 +29,7 @@ type PTT struct {
 }
 
 var (
-	over18cookie *http.Cookie = &http.Cookie{Name: "over18", Value: "1"}
-	// defaultClient *http.Client = getClient()
+	over18cookie  *http.Cookie = &http.Cookie{Name: "over18", Value: "1"}
 	defaultClient *http.Client = &http.Client{}
 )
 
@@ -80,6 +79,9 @@ func isValidBoard(bbsUrl, board string) bool {
 }
 
 func (p *PTT) CrawlBoard(board string) {
+	if !isValidBoard(p.bbsURL, board) {
+		log.Fatal("Boardname not valid!")
+	}
 	URLlist, err := p.GetArticlesURLThread(board, p.pages)
 	if err != nil {
 		log.Fatal(err)
@@ -91,21 +93,8 @@ func (p *PTT) CrawlBoard(board string) {
 	for i := range URLlist {
 		sem <- 1
 		go CrawlArticleThread(URLlist[i], articles, sem)
-		if i%100 == 0 {
-			fmt.Printf("%d articles...\n", len(articles))
-		}
+		fmt.Println(i, URLlist[i])
 		time.Sleep(100)
-		// if (i+1)%maxNumArticles == 0 {
-		// 	// fmt.Println("Due to CDN's limit of traffic, now wait 1 minute and create files...")
-		// 	for len(articles) != maxNumArticles && len(sem) != 0 {
-		// 	}
-		// 	fmt.Printf("%d articles have been downloaded!", len(articles))
-		// 	close(articles)
-		// 	go saveFile(p.storePath, articles)
-		// 	// time.Sleep(60 * time.Second)
-		// 	articles = make(chan article, maxNumArticles)
-		// 	remains -= maxNumArticles
-		// }
 	}
 	for len(articles) != remains {
 	}

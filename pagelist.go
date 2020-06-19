@@ -21,7 +21,6 @@ func (p *PTT) GetArticlesURLThread(board string, pages int) (URLs []string, e er
 	}
 	for i, j := n-pages, n-pages+pages/p.numOfRoutine; ; j += pages / p.numOfRoutine {
 		sem <- 1
-		fmt.Println(i, j, n)
 		if j >= n {
 			go getArticleListThread(p.baseURL, board, i, n, sem, pageList, errc)
 			counter++
@@ -107,18 +106,17 @@ func checkArticlePage(url string, n int) bool {
 	url = url + strconv.Itoa(n) + ".html"
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		log.Println("err: ", err)
+		log.Println("checkArticlePage: ", err)
 		return false
 	}
 	req.AddCookie(over18cookie)
 	resp, err := defaultClient.Do(req)
 	if err != nil {
-		log.Println("err: ", err)
+		log.Println("checkArticlePage: ", err)
 		return false
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
-		log.Println(err)
 		return false
 	}
 	return true
