@@ -7,11 +7,15 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func testOneBoard(t *testing.T) {
-
+func Benchmark_CrawlBoardWithoutPrint(t *testing.B) {
+	p := NewPTT(testDir, testPages, testNumOfRoutine)
+	for i := 0; i < t.N; i++ {
+		p.CrawlBoard("Gossiping")
+	}
 }
+
 func Test_SetBoard(t *testing.T) {
-	p := NewPTT("dat/")
+	p := NewPTT(testDir, testPages, testNumOfRoutine)
 	validBoard := []string{"gossiping", "Gossiping", "seniorhigh", "b07902xxx"}
 	invalidBoard := []string{"ABCfjisiodjs", "fjiosw9dnjsc", "123", "ABCDEFG"}
 	assert := assert.New(t)
@@ -27,9 +31,9 @@ func Test_SetBoard(t *testing.T) {
 		}
 	}
 
-	pWithValidSlice := NewPTT("dat/")
+	pWithValidSlice := NewPTT(testDir, testPages, testNumOfRoutine)
 	pWithValidSlice.SetBoardWithSlice(validBoard)
-	pWithInvalidSlice := NewPTT("dat/")
+	pWithInvalidSlice := NewPTT(testDir, testPages, testNumOfRoutine)
 	pWithInvalidSlice.SetBoardWithSlice(invalidBoard)
 	assert.True(p.board.Equal(pWithValidSlice.board))
 	assert.False(p.board.Equal(pWithInvalidSlice.board))

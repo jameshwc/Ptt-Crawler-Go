@@ -5,7 +5,7 @@ import (
 )
 
 const (
-	pages        = 1
+	pages        = 1000
 	numOfRoutine = 100
 	storePath    = "dat/"
 )

@@ -53,7 +53,7 @@ func (p *PTT) GetArticlesURL(board string, pages int) (URLs []string, e error) {
 func getArticleList(baseURL, board string, start, end int) ([]string, error) {
 	var articleList []string
 	for i := start; i <= end; i++ {
-		doc, err := parseUrl(baseURL + "bbs/" + board + "/index" + strconv.Itoa(i) + ".html")
+		doc, err := parseURL(baseURL + "bbs/" + board + "/index" + strconv.Itoa(i) + ".html")
 		if err != nil {
 			return articleList, err
 		}
@@ -88,7 +88,7 @@ func getArticleListThread(baseURL, board string, start, end int, sem chan int, l
 	}
 	var articleList []string
 	for i := start; i <= end; i++ {
-		doc, err := parseUrl(baseURL + "bbs/" + board + "/index" + strconv.Itoa(i) + ".html")
+		doc, err := parseURL(baseURL + "bbs/" + board + "/index" + strconv.Itoa(i) + ".html")
 		if err != nil {
 			e <- err
 			return

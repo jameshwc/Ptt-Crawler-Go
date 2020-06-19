@@ -1,9 +1,7 @@
 package ptt
 
 import (
-	"fmt"
 	"log"
-	"net/http"
 	. "strings"
 
 	"github.com/PuerkitoBio/goquery"
@@ -40,7 +38,7 @@ func CrawlArticleThread(url string, ch chan article, sem chan int) {
 
 }
 func getArticle(url string) (article, error) {
-	doc, err := parseUrl(url)
+	doc, err := parseURL(url)
 	if err != nil {
 		log.Println(err)
 		return article{}, err
@@ -67,8 +65,14 @@ func getArticle(url string) (article, error) {
 		vote := s.Find(".push-tag").Text()
 		userid := s.Find(".push-userid").Text()
 		trimContent := func(s string) string {
+			if len(s) == 0 {
+				return s
+			}
 			if s[0] == ':' {
-				return TrimSpace(s[1:])
+				if len(s) > 1 {
+					return s[1:]
+				}
+				return ""
 			}
 			return TrimSpace(s)
 		}
@@ -84,22 +88,7 @@ func getArticle(url string) (article, error) {
 	// now "doc.Find("#main-content").Text()" has all the content including the author's reply in the reply area
 	return article{Board: board, Class: class, Title: title, Author: author, Timestamp: timestamp, Content: content, Replies: replies}, nil
 }
-func parseUrl(url string) (*goquery.Document, error) {
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.AddCookie(over18cookie)
-	resp, err := defaultClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("ParseUrl: status code %d %s at %s url", resp.StatusCode, resp.Status, url)
-	}
-	return goquery.NewDocumentFromReader(resp.Body)
-}
+
 func parseArticleAttr(s *goquery.Selection) (author, board, class, title, date string) {
 	author = TrimSpace(Split(s.Eq(0).Text(), "(")[0])
 	board = s.Eq(1).Text()
