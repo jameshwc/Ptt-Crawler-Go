@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
@@ -18,31 +19,27 @@ func (p *PTT) getArticlesURLThread(board string, startPage, endPage int) (URLs [
 	n := endPage - startPage + 1
 	pageList := make(chan []string, n)
 	errc := make(chan error, n)
-	counter := 0
 	if n < p.numOfRoutine {
 		p.numOfRoutine = n
+	}
+	wg := new(sync.WaitGroup)
+	if n%p.numOfRoutine == 0 {
+		wg.Add(p.numOfRoutine)
+	} else {
+		wg.Add(p.numOfRoutine + 1)
 	}
 	for i, j := startPage, startPage+n/p.numOfRoutine; ; j += n / p.numOfRoutine {
 		fmt.Println(i, j, n)
 		sem <- 1
 		if j >= endPage {
-			go getArticleListThread(p.baseURL, board, i, endPage, sem, pageList, errc)
-			counter++
+			go getArticleListThread(p.baseURL, board, i, endPage, sem, pageList, errc, wg)
 			break
 		}
-		go getArticleListThread(p.baseURL, board, i, j, sem, pageList, errc)
+		go getArticleListThread(p.baseURL, board, i, j, sem, pageList, errc, wg)
 		time.Sleep(50)
-		counter++
 		i = j + 1
 	}
-	for len(pageList)+len(errc) != counter {
-		fmt.Println(len(pageList), len(errc), counter)
-		time.Sleep(2 * time.Second)
-		if len(errc) != 0 {
-			e := <-errc
-			fmt.Println(e.Error())
-		}
-	}
+	wg.Wait()
 	close(pageList)
 	close(errc)
 	for i := range pageList {
@@ -88,8 +85,11 @@ func getLastArticlePage(url string) int {
 	return left - 1 // To avoid overlapped articles
 }
 
-func getArticleListThread(baseURL, board string, start, end int, sem chan int, list chan []string, e chan error) {
-	endFunc := func() { <-sem }
+func getArticleListThread(baseURL, board string, start, end int, sem chan int, list chan []string, e chan error, wg *sync.WaitGroup) {
+	endFunc := func() {
+		<-sem
+		wg.Done()
+	}
 	defer endFunc()
 	if start > end {
 		e <- fmt.Errorf("getArticleList: start %d is greater than end %d", start, end)

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	mapset "github.com/deckarep/golang-set"
@@ -88,15 +89,15 @@ func (p *PTT) CrawlBoard(board string) {
 	fmt.Printf("Completely downloading URLlist...Got %d articles ready to download...\n", len(URLlist))
 	sem := make(chan int, p.numOfRoutine)
 	articles := make(chan article, (p.pages+1)*30) // make sure channel has enough space if page == 1
-	remains := len(URLlist)
+	wg := new(sync.WaitGroup)
+	wg.Add(len(URLlist))
 	for i := range URLlist {
 		sem <- 1
-		go CrawlArticleThread(URLlist[i], articles, sem)
+		go CrawlArticleThread(URLlist[i], articles, sem, wg)
 		fmt.Println(i, URLlist[i])
 		time.Sleep(100)
 	}
-	for len(articles) != remains {
-	}
+	wg.Wait()
 	close(articles)
 	fmt.Println("All articles downloaded!")
 	saveFile(p.storePath, articles)
