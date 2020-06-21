@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"time"
 
@@ -81,14 +82,22 @@ func (p *PTT) CrawlBoard(board string) {
 	if !isValidBoard(p.bbsURL, board) {
 		log.Fatal("Boardname not valid!")
 	}
-	latestPage := getLastArticlePage(p.bbsURL + board + "/index")
-	URLlist, err := p.getArticlesURLThread(board, latestPage-p.pages, latestPage)
+	endPage := getLastArticlePage(p.bbsURL + board + "/index")
+	startPage := endPage - p.pages
+	URLlist, err := p.getArticlesURLThread(board, startPage, endPage)
 	if err != nil {
 		log.Fatal(err)
 	}
 	fmt.Printf("Completely downloading URLlist...Got %d articles ready to download...\n", len(URLlist))
+	articles := p.crawlArticles(URLlist)
+	fmt.Println("All articles downloaded!")
+	filename := filepath.Join(p.storePath, board+"_P"+strconv.Itoa(startPage)+"_"+strconv.Itoa(endPage)+"_T"+time.Now().Format("0102_15")+".json")
+	saveFile(articles, filename)
+}
+
+func (p *PTT) crawlArticles(URLlist []string) chan article {
 	sem := make(chan int, p.numOfRoutine)
-	articles := make(chan article, (p.pages+1)*30) // make sure channel has enough space if page == 1
+	articles := make(chan article, len(URLlist)) // make sure channel has enough space if page == 1
 	wg := new(sync.WaitGroup)
 	wg.Add(len(URLlist))
 	for i := range URLlist {
@@ -99,11 +108,9 @@ func (p *PTT) CrawlBoard(board string) {
 	}
 	wg.Wait()
 	close(articles)
-	fmt.Println("All articles downloaded!")
-	saveFile(p.storePath, articles)
+	return articles
 }
-
-func saveFile(path string, articles chan article) {
+func saveFile(articles chan article, filename string) {
 	articleSlice := make([]article, len(articles))
 	idx := 0
 	for a := range articles {
@@ -115,7 +122,7 @@ func saveFile(path string, articles chan article) {
 		log.Fatal(err)
 	}
 	fmt.Println("Now create json file...")
-	outputFile, err := os.Create(filepath.Join(path, time.Now().Format("0102_150405")+".json"))
+	outputFile, err := os.Create(filename)
 	if err != nil {
 		log.Fatal(err)
 	}

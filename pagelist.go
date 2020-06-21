@@ -24,12 +24,15 @@ func (p *PTT) getArticlesURLThread(board string, startPage, endPage int) (URLs [
 	}
 	wg := new(sync.WaitGroup)
 	if n%p.numOfRoutine == 0 {
-		wg.Add(p.numOfRoutine)
+		wg.Add(p.numOfRoutine - 1)
+		fmt.Println(p.numOfRoutine - 1)
 	} else {
-		wg.Add(p.numOfRoutine + 1)
+		wg.Add(p.numOfRoutine)
+		fmt.Println(p.numOfRoutine)
 	}
+	counter := 0
 	for i, j := startPage, startPage+n/p.numOfRoutine; ; j += n / p.numOfRoutine {
-		fmt.Println(i, j, n)
+		fmt.Println(counter, i, j)
 		sem <- 1
 		if j >= endPage {
 			go getArticleListThread(p.baseURL, board, i, endPage, sem, pageList, errc, wg)
@@ -38,8 +41,11 @@ func (p *PTT) getArticlesURLThread(board string, startPage, endPage int) (URLs [
 		go getArticleListThread(p.baseURL, board, i, j, sem, pageList, errc, wg)
 		time.Sleep(50)
 		i = j + 1
+		counter++
 	}
+	fmt.Println(counter)
 	wg.Wait()
+	fmt.Println("hi")
 	close(pageList)
 	close(errc)
 	for i := range pageList {
