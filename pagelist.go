@@ -10,19 +10,23 @@ import (
 	"github.com/PuerkitoBio/goquery"
 )
 
-func (p *PTT) GetArticlesURLThread(board string, pages int) (URLs []string, e error) {
-	sem := make(chan int, p.numOfRoutine)
-	pageList := make(chan []string, pages)
-	errc := make(chan error, pages)
-	n := getLastArticlePage(p.baseURL + "bbs/" + board + "/index")
-	counter := 0
-	if pages < p.numOfRoutine {
-		p.numOfRoutine = pages
+func (p *PTT) getArticlesURLThread(board string, startPage, endPage int) (URLs []string, e error) {
+	if endPage == -1 {
+		endPage = getLastArticlePage(board)
 	}
-	for i, j := n-pages, n-pages+pages/p.numOfRoutine; ; j += pages / p.numOfRoutine {
+	sem := make(chan int, p.numOfRoutine)
+	n := endPage - startPage + 1
+	pageList := make(chan []string, n)
+	errc := make(chan error, n)
+	counter := 0
+	if n < p.numOfRoutine {
+		p.numOfRoutine = n
+	}
+	for i, j := startPage, startPage+n/p.numOfRoutine; ; j += n / p.numOfRoutine {
+		fmt.Println(i, j, n)
 		sem <- 1
-		if j >= n {
-			go getArticleListThread(p.baseURL, board, i, n, sem, pageList, errc)
+		if j >= endPage {
+			go getArticleListThread(p.baseURL, board, i, endPage, sem, pageList, errc)
 			counter++
 			break
 		}
@@ -32,6 +36,12 @@ func (p *PTT) GetArticlesURLThread(board string, pages int) (URLs []string, e er
 		i = j + 1
 	}
 	for len(pageList)+len(errc) != counter {
+		fmt.Println(len(pageList), len(errc), counter)
+		time.Sleep(2 * time.Second)
+		if len(errc) != 0 {
+			e := <-errc
+			fmt.Println(e.Error())
+		}
 	}
 	close(pageList)
 	close(errc)
@@ -46,9 +56,8 @@ func (p *PTT) GetArticlesURLThread(board string, pages int) (URLs []string, e er
 	return
 }
 
-func (p *PTT) GetArticlesURL(board string, pages int) (URLs []string, e error) {
-	n := getLastArticlePage(p.baseURL + "bbs/" + board + "/index")
-	return getArticleList(p.baseURL, board, n-pages, n)
+func (p *PTT) GetArticlesURL(board string, start, end int) (URLs []string, e error) {
+	return getArticleList(p.baseURL, board, start, end)
 }
 func getArticleList(baseURL, board string, start, end int) ([]string, error) {
 	var articleList []string

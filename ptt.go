@@ -1,13 +1,11 @@
 package ptt
 
 import (
-	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
 	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"time"
@@ -82,7 +80,8 @@ func (p *PTT) CrawlBoard(board string) {
 	if !isValidBoard(p.bbsURL, board) {
 		log.Fatal("Boardname not valid!")
 	}
-	URLlist, err := p.GetArticlesURLThread(board, p.pages)
+	latestPage := getLastArticlePage(p.bbsURL + board + "/index")
+	URLlist, err := p.getArticlesURLThread(board, latestPage-p.pages, latestPage)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -123,17 +122,6 @@ func saveFile(path string, articles chan article) {
 	outputFile.Write(jsonData)
 }
 
-func getClient() *http.Client {
-	proxyURL, err := url.Parse("proxy.hinet.net")
-	if err != nil {
-		panic(err)
-	}
-	t := &http.Transport{
-		Proxy:           http.ProxyURL(proxyURL),
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-	return &http.Client{
-		Transport: t,
-		Timeout:   time.Duration(10 * time.Second),
-	}
+func (p *PTT) getBoardURL(board string) string { // without .html
+	return p.bbsURL + board + "/index"
 }
