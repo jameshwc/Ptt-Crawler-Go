@@ -12,10 +12,9 @@ import (
 )
 
 func (p *PTT) getArticlesURLThread(board string, startPage, endPage int) (URLs []string, e error) {
-	if endPage == -1 {
+	if endPage < 0 {
 		endPage = getLastArticlePage(board)
 	}
-	sem := make(chan int, p.numOfRoutine)
 	n := endPage - startPage + 1
 	pageList := make(chan []string, n)
 	errc := make(chan error, n)
@@ -25,41 +24,37 @@ func (p *PTT) getArticlesURLThread(board string, startPage, endPage int) (URLs [
 	wg := new(sync.WaitGroup)
 	if n%p.numOfRoutine == 0 {
 		wg.Add(p.numOfRoutine - 1)
-		fmt.Println(p.numOfRoutine - 1)
 	} else {
 		wg.Add(p.numOfRoutine)
-		fmt.Println(p.numOfRoutine)
 	}
 	counter := 0
 	for i, j := startPage, startPage+n/p.numOfRoutine; ; j += n / p.numOfRoutine {
-		fmt.Println(counter, i, j)
-		sem <- 1
 		if j >= endPage {
-			go getArticleListThread(p.baseURL, board, i, endPage, sem, pageList, errc, wg)
+			go getArticleListThread(p.baseURL, board, i, endPage, pageList, errc, wg)
 			break
 		}
-		go getArticleListThread(p.baseURL, board, i, j, sem, pageList, errc, wg)
-		time.Sleep(50)
+		go getArticleListThread(p.baseURL, board, i, j, pageList, errc, wg)
+		time.Sleep(100)
 		i = j + 1
 		counter++
 	}
-	fmt.Println(counter)
 	wg.Wait()
-	fmt.Println("hi")
 	close(pageList)
 	close(errc)
 	for i := range pageList {
 		URLs = append(URLs, i...)
 	}
 	if len(errc) != 0 {
+		log.Printf("Has %d Errors!\n", len(errc))
 		e = <-errc
 	} else {
 		e = nil
 	}
+	fmt.Printf("Completely downloading URLlist...Got %d articles ready to download...\n", len(URLs))
 	return
 }
 
-func (p *PTT) GetArticlesURL(board string, start, end int) (URLs []string, e error) {
+func (p *PTT) getArticlesURL(board string, start, end int) (URLs []string, e error) {
 	return getArticleList(p.baseURL, board, start, end)
 }
 func getArticleList(baseURL, board string, start, end int) ([]string, error) {
@@ -91,12 +86,8 @@ func getLastArticlePage(url string) int {
 	return left - 1 // To avoid overlapped articles
 }
 
-func getArticleListThread(baseURL, board string, start, end int, sem chan int, list chan []string, e chan error, wg *sync.WaitGroup) {
-	endFunc := func() {
-		<-sem
-		wg.Done()
-	}
-	defer endFunc()
+func getArticleListThread(baseURL, board string, start, end int, list chan []string, e chan error, wg *sync.WaitGroup) {
+	defer wg.Done()
 	if start > end {
 		e <- fmt.Errorf("getArticleList: start %d is greater than end %d", start, end)
 		return
