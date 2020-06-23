@@ -27,7 +27,6 @@ type PTT struct {
 	numOfRoutine int
 	pages        int
 	delayTime    time.Duration
-	board        mapset.Set
 }
 
 var (
@@ -41,34 +40,9 @@ func NewPTT(storePathFolder string, pages, numsOfRoutine int) *PTT {
 	p.bbsURL = "https://www.ptt.cc/bbs/"
 	p.storePath = storePathFolder
 	p.numOfRoutine = numsOfRoutine
-	p.board = mapset.NewSet()
 	p.pages = pages
 	p.delayTime = 120
 	return p
-}
-
-func (p *PTT) SetBoard(board string) error {
-	if isValidBoard(p.bbsURL, board) {
-		p.board.Add(board)
-	} else {
-		return fmt.Errorf("board name %s not valid", board)
-	}
-	return nil
-}
-
-func (p *PTT) SetBoardWithSlice(board []string) error {
-	errMsg := ""
-	for id := range board {
-		if isValidBoard(p.bbsURL, board[id]) {
-			p.board.Add(board[id])
-		} else {
-			errMsg += board[id] + " "
-		}
-	}
-	if len(errMsg) > 0 {
-		return errors.New("board name " + errMsg + "not valid")
-	}
-	return nil
 }
 
 func isValidBoard(bbsUrl, board string) bool {
