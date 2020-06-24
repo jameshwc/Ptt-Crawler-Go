@@ -10,19 +10,20 @@ const (
 	testDir          = "test/"
 	testPages        = 1
 	testNumOfRoutine = 100
+	testPagePerFile	 = 1000
 )
 
 func Benchmark_GetArticlesURLThread(b *testing.B) {
-	p := NewPTT(testDir, testPages, testNumOfRoutine)
+	p := NewPTT(testDir, testPages, testNumOfRoutine, testPagePerFile)
 	for i := 0; i < b.N; i++ {
 		p.getArticlesURLThread("Seniorhigh", 500, -1)
 	}
 }
 
 func Benchmark_GetArticlesURL(b *testing.B) {
-	p := NewPTT(testDir, testPages, testNumOfRoutine)
+	p := NewPTT(testDir, testPages, testNumOfRoutine, testPagePerFile)
 	for i := 0; i < b.N; i++ {
-		p.GetArticlesURL("Seniorhigh", 500, -1)
+		p.getArticlesURL("Seniorhigh", 500, -1)
 	}
 }
 
@@ -48,6 +49,5 @@ func Test_getLastArticlePage(t *testing.T) {
 		}
 		sendRequest(url+strconv.Itoa(n)+".html", false)
 		sendRequest(url+strconv.Itoa(n+2)+".html", true) // getLastArticlePage will not return exact last page; instead, it return the num of last two page to avoid overlapped articles
-
 	}
 }

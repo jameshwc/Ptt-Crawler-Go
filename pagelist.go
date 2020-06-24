@@ -69,6 +69,7 @@ func getArticleList(baseURL, board string, start, end int) ([]string, error) {
 			if exist {
 				articleList = append(articleList, baseURL+val[1:])
 			}
+
 		})
 	}
 	return articleList, nil

@@ -26,6 +26,7 @@ type PTT struct {
 	storePath    string
 	numOfRoutine int
 	pages        int
+	pagePerFile	 int
 	delayTime    time.Duration
 }
 
@@ -34,13 +35,14 @@ var (
 	defaultClient *http.Client = &http.Client{}
 )
 
-func NewPTT(storePathFolder string, pages, numsOfRoutine int) *PTT {
+func NewPTT(storePathFolder string, pages, numsOfRoutine, pagePerFile int) *PTT {
 	p := new(PTT)
 	p.baseURL = "https://www.ptt.cc/"
 	p.bbsURL = "https://www.ptt.cc/bbs/"
 	p.storePath = storePathFolder
 	p.numOfRoutine = numsOfRoutine
 	p.pages = pages
+	p.pagePerFile = pagePerFile
 	p.delayTime = 120
 	return p
 }
@@ -106,13 +108,21 @@ func (p *PTT) CrawlURLlistToFile(board string, startPage, endPage int, filename 
 }
 
 func (p *PTT) crawlBoard(board string, startPage, endPage int) {
-	URLlist, err := p.getArticlesURLThread(board, startPage, endPage)
-	if err != nil {
-		log.Fatal(err)
+	start, end := startPage, startPage+p.pagePerFile
+	for start <= endPage {
+		if end > endPage {
+			end = endPage
+		}
+		URLlist, err := p.getArticlesURLThread(board, start, end)
+		if err != nil {
+			log.Fatal(err)
+		}
+		articles := p.crawlArticles(URLlist)
+		filename := filepath.Join(p.storePath, board+"_P"+strconv.Itoa(start)+"_"+strconv.Itoa(end)+"_T"+time.Now().Format("0102_15")+".json")
+		saveFile(articles, filename)
+		start = end+1
+		end += p.pagePerFile
 	}
-	articles := p.crawlArticles(URLlist)
-	filename := filepath.Join(p.storePath, board+"_P"+strconv.Itoa(startPage)+"_"+strconv.Itoa(endPage)+"_T"+time.Now().Format("0102_15")+".json")
-	saveFile(articles, filename)
 }
 func (p *PTT) crawlArticles(URLlist []string) chan article {
 	sem := make(chan int, p.numOfRoutine)
