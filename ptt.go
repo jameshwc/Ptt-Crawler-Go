@@ -62,6 +62,7 @@ func (p *PTT) CrawlBoard(board string) {
 		log.Fatal("Boardname not valid!")
 	}
 	endPage := getLastArticlePage(p.getBoardURL(board))
+	fmt.Printf("Now begin downloading from %d page to %d page...", endPage-p.pages, endPage)
 	p.crawlBoard(board, endPage-p.pages, endPage)
 }
 
@@ -96,7 +97,7 @@ func (p *PTT) CrawlURLlistToFile(board string, startPage, endPage int, filename 
 	}
 	defer file.Close()
 	if latestPage := getLastArticlePage(p.getBoardURL(board)); endPage < 0 || endPage > latestPage {
-
+		log.Fatalf("There's something wrong with endPage %d!", endPage)
 	}
 	URLlist, err := p.getArticlesURLThread(board, startPage, endPage)
 	if err != nil {
@@ -109,20 +110,29 @@ func (p *PTT) CrawlURLlistToFile(board string, startPage, endPage int, filename 
 
 func (p *PTT) crawlBoard(board string, startPage, endPage int) {
 	start, end := startPage, startPage+p.pagePerFile
+	wg := new(sync.WaitGroup)
 	for start <= endPage {
+		//fmt.Println(start, end)
+		wg.Add(1)
 		if end > endPage {
 			end = endPage
 		}
-		URLlist, err := p.getArticlesURLThread(board, start, end)
-		if err != nil {
-			log.Fatal(err)
-		}
-		articles := p.crawlArticles(URLlist)
-		filename := filepath.Join(p.storePath, board+"_P"+strconv.Itoa(start)+"_"+strconv.Itoa(end)+"_T"+time.Now().Format("0102_15")+".json")
-		saveFile(articles, filename)
+		go p.crawlPages(board, startPage, endPage, wg)
 		start = end+1
 		end += p.pagePerFile
+		time.Sleep(p.delayTime)
 	}
+	wg.Wait()
+}
+func (p *PTT) crawlPages(board string, start, end int, wg *sync.WaitGroup){
+	URLlist, err := p.getArticlesURLThread(board, start, end)
+	if err != nil {
+		log.Fatal(err)
+	}
+	articles := p.crawlArticles(URLlist)
+	filename := filepath.Join(p.storePath, board+"_P"+strconv.Itoa(start)+"_"+strconv.Itoa(end)+"_T"+time.Now().Format("0102_15")+".json")
+	saveFile(articles, filename)
+	wg.Done()
 }
 func (p *PTT) crawlArticles(URLlist []string) chan article {
 	sem := make(chan int, p.numOfRoutine)
@@ -133,7 +143,7 @@ func (p *PTT) crawlArticles(URLlist []string) chan article {
 	for i := range URLlist {
 		sem <- 1
 		go CrawlArticleThread(URLlist[i], articles, sem, wg)
-		fmt.Printf("\r[%d/%d] %s", i, n, URLlist[i])
+		fmt.Printf("\r[%d/%d] %s", i+1, n, URLlist[i])
 		time.Sleep(p.delayTime)
 	}
 	wg.Wait()

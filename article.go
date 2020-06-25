@@ -3,6 +3,7 @@ package ptt
 import (
 	"log"
 	. "strings"
+	"sync"
 
 	"github.com/PuerkitoBio/goquery"
 )
@@ -29,13 +30,15 @@ func CrawlArticle(url string) (article, error) {
 	return getArticle(url)
 }
 
-func CrawlArticleThread(url string, ch chan article, sem chan int) {
+func CrawlArticleThread(url string, ch chan article, sem chan int, wg *sync.WaitGroup) {
 	a, err := getArticle(url)
 	if err == nil {
 		ch <- a
+	} else {
+		log.Println(err.Error())
 	}
 	<-sem
-
+	wg.Done()
 }
 func getArticle(url string) (article, error) {
 	doc, err := parseURL(url)
