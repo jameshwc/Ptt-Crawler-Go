@@ -25,7 +25,7 @@ func (p *PTT) getArticlesURLThread(board string, startPage, endPage int) (URLs [
 	if n%p.numOfRoutine == 0 {
 		wg.Add(p.numOfRoutine - 1)
 	} else {
-		wg.Add(p.numOfRoutine)
+		wg.Add(p.numOfRoutine + 1)
 	}
 	counter := 0
 	for i, j := startPage, startPage+n/p.numOfRoutine; ; j += n / p.numOfRoutine {
@@ -34,7 +34,7 @@ func (p *PTT) getArticlesURLThread(board string, startPage, endPage int) (URLs [
 			break
 		}
 		go getArticleListThread(p.baseURL, board, i, j, pageList, errc, wg)
-		time.Sleep(100)
+		time.Sleep(p.delayTime)
 		i = j + 1
 		counter++
 	}
@@ -50,7 +50,7 @@ func (p *PTT) getArticlesURLThread(board string, startPage, endPage int) (URLs [
 	} else {
 		e = nil
 	}
-	fmt.Printf("Completely downloading URLlist...Got %d articles ready to download...\n", len(URLs))
+	// fmt.Printf("Completely downloading URLlist...Got %d articles ready to download...\n", len(URLs))
 	return
 }
 

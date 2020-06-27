@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -16,26 +17,24 @@ import (
 	mapset "github.com/deckarep/golang-set"
 )
 
-const (
-	maxNumArticles = 15000
-)
-
 type PTT struct {
-	baseURL      string
-	bbsURL       string
-	storePath    string
-	numOfRoutine int
-	pages        int
-	pagePerFile	 int
-	delayTime    time.Duration
+	baseURL          string
+	bbsURL           string
+	storePath        string
+	numOfRoutine     int
+	writeFileRoutine int
+	pages            int
+	pagePerFile      int
+	delayTime        time.Duration
 }
 
 var (
 	over18cookie  *http.Cookie = &http.Cookie{Name: "over18", Value: "1"}
 	defaultClient *http.Client = &http.Client{}
+	secondClient  *http.Client
 )
 
-func NewPTT(storePathFolder string, pages, numsOfRoutine, pagePerFile int) *PTT {
+func NewPTT(storePathFolder string, pages, numsOfRoutine, pagePerFile int, delayTime int64) *PTT {
 	p := new(PTT)
 	p.baseURL = "https://www.ptt.cc/"
 	p.bbsURL = "https://www.ptt.cc/bbs/"
@@ -43,7 +42,13 @@ func NewPTT(storePathFolder string, pages, numsOfRoutine, pagePerFile int) *PTT 
 	p.numOfRoutine = numsOfRoutine
 	p.pages = pages
 	p.pagePerFile = pagePerFile
-	p.delayTime = 120
+	p.delayTime = delayTime
+	p.writeFileRoutine = 1
+	proxyURL, err := url.Parse("http://205.185.115.100:8080")
+	if err != nil {
+		log.Fatal("Error when set up proxy: ", err)
+	}
+	secondClient = &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(proxyURL)}}
 	return p
 }
 
@@ -62,7 +67,7 @@ func (p *PTT) CrawlBoard(board string) {
 		log.Fatal("Boardname not valid!")
 	}
 	endPage := getLastArticlePage(p.getBoardURL(board))
-	fmt.Printf("Now begin downloading from %d page to %d page...", endPage-p.pages, endPage)
+	fmt.Printf("Now begin downloading from %d page to %d page...\n", endPage-p.pages, endPage)
 	p.crawlBoard(board, endPage-p.pages, endPage)
 }
 
@@ -109,32 +114,37 @@ func (p *PTT) CrawlURLlistToFile(board string, startPage, endPage int, filename 
 }
 
 func (p *PTT) crawlBoard(board string, startPage, endPage int) {
-	start, end := startPage, startPage+p.pagePerFile
-	wg := new(sync.WaitGroup)
+	// p.crawlPages(board, startPage, endPage)
+	start, end := startPage, startPage+p.pagePerFile-1
+	// wg := new(sync.WaitGroup)
+	// sem := make(chan int, p.writeFileRoutine)
 	for start <= endPage {
-		//fmt.Println(start, end)
-		wg.Add(1)
+		// 	//fmt.Println(start, end)
+		// 	wg.Add(1)
 		if end > endPage {
 			end = endPage
 		}
-		go p.crawlPages(board, startPage, endPage, wg)
-		start = end+1
+		// 	sem <- 1
+		p.crawlPages(board, start, end)
+		start = end + 1
 		end += p.pagePerFile
 		time.Sleep(p.delayTime)
 	}
-	wg.Wait()
+	// wg.Wait()
 }
-func (p *PTT) crawlPages(board string, start, end int, wg *sync.WaitGroup){
+func (p *PTT) crawlPages(board string, start, end int) {
 	URLlist, err := p.getArticlesURLThread(board, start, end)
 	if err != nil {
 		log.Fatal(err)
 	}
-	articles := p.crawlArticles(URLlist)
+	// fmt.Printf("Crawl Pages from %d to %d...\n", start, end)
+	articles := p.crawlArticles(URLlist, fmt.Sprintf("Page %d-%d", start, end))
 	filename := filepath.Join(p.storePath, board+"_P"+strconv.Itoa(start)+"_"+strconv.Itoa(end)+"_T"+time.Now().Format("0102_15")+".json")
 	saveFile(articles, filename)
-	wg.Done()
+	// wg.Done()
+	// <-sem
 }
-func (p *PTT) crawlArticles(URLlist []string) chan article {
+func (p *PTT) crawlArticles(URLlist []string, s ...interface{}) chan article {
 	sem := make(chan int, p.numOfRoutine)
 	n := len(URLlist)
 	articles := make(chan article, n) // make sure channel has enough space if page == 1
@@ -143,12 +153,12 @@ func (p *PTT) crawlArticles(URLlist []string) chan article {
 	for i := range URLlist {
 		sem <- 1
 		go CrawlArticleThread(URLlist[i], articles, sem, wg)
-		fmt.Printf("\r[%d/%d] %s", i+1, n, URLlist[i])
+		fmt.Printf("\r%s [%d/%d] %s", s, i+1, n, URLlist[i])
 		time.Sleep(p.delayTime)
 	}
 	wg.Wait()
 	close(articles)
-	fmt.Println("All articles downloaded!")
+	fmt.Println(" All articles downloaded!")
 	return articles
 }
 func saveFile(articles chan article, filename string) {
@@ -162,7 +172,7 @@ func saveFile(articles chan article, filename string) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println("Now create json file...")
+	// fmt.Println("Now create json file...")
 	outputFile, err := os.Create(filename)
 	if err != nil {
 		log.Fatal(err)
